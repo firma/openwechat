@@ -3,10 +3,8 @@ package openwechat
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"io"
 	"math/rand"
-	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -16,13 +14,15 @@ import (
 	"unsafe"
 )
 
-func ToBuffer(v interface{}) (*bytes.Buffer, error) {
-	var buffer bytes.Buffer
-	encoder := json.NewEncoder(&buffer)
+func jsonEncode(v interface{}) (io.Reader, error) {
+	var buffer = bytes.NewBuffer(nil)
+	encoder := json.NewEncoder(buffer)
 	// 这里要设置禁止html转义
 	encoder.SetEscapeHTML(false)
-	err := encoder.Encode(v)
-	return &buffer, err
+	if err := encoder.Encode(v); err != nil {
+		return nil, err
+	}
+	return buffer, nil
 }
 
 // GetRandomDeviceId 获取随机设备id
@@ -38,17 +38,8 @@ func GetRandomDeviceId() string {
 	return builder.String()
 }
 
-func getWebWxDataTicket(cookies []*http.Cookie) string {
-	for _, cookie := range cookies {
-		if cookie.Name == "webwx_data_ticket" {
-			return cookie.Value
-		}
-	}
-	return ""
-}
-
 // GetFileContentType 获取文件上传的类型
-func GetFileContentType(file multipart.File) (string, error) {
+func GetFileContentType(file io.Reader) (string, error) {
 	data := make([]byte, 512)
 	if _, err := file.Read(data); err != nil {
 		return "", err
@@ -80,14 +71,6 @@ func getMessageType(filename string) string {
 		return video
 	}
 	return doc
-}
-
-func scanXml(reader io.Reader, v interface{}) error {
-	return xml.NewDecoder(reader).Decode(v)
-}
-
-func scanJson(reader io.Reader, v interface{}) error {
-	return json.NewDecoder(reader).Decode(v)
 }
 
 func stringToByte(s string) []byte {
